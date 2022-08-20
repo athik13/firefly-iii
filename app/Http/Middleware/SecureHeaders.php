@@ -1,4 +1,5 @@
 <?php
+
 /**
  * SecureHeaders.php
  * Copyright (c) 2019 james@firefly-iii.org
@@ -33,92 +34,94 @@ use Illuminate\Http\Request;
  */
 class SecureHeaders
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param Request $request
-     * @param Closure $next
-     *
-     * @return mixed
-     * @throws Exception
-     */
-    public function handle(Request $request, Closure $next)
-    {
-        // generate and share nonce.
-        $nonce = base64_encode(random_bytes(16));
-        app('view')->share('JS_NONCE', $nonce);
+  /**
+   * Handle an incoming request.
+   *
+   * @param Request $request
+   * @param Closure $next
+   *
+   * @return mixed
+   * @throws Exception
+   */
+  public function handle(Request $request, Closure $next)
+  {
+    // generate and share nonce.
+    $nonce = base64_encode(random_bytes(16));
+    app('view')->share('JS_NONCE', $nonce);
 
-        $response          = $next($request);
-        $trackingScriptSrc = $this->getTrackingScriptSource();
-        $csp               = [
-            "default-src 'none'",
-            "object-src 'none'",
-            sprintf("script-src 'unsafe-eval' 'strict-dynamic' 'self' 'unsafe-inline' 'nonce-%1s' %2s", $nonce, $trackingScriptSrc),
-            "style-src 'unsafe-inline' 'self'",
-            "base-uri 'self'",
-            "font-src 'self' data:",
-            sprintf("connect-src 'self' %s", $trackingScriptSrc),
-            sprintf("img-src data: 'strict-dynamic' 'self' *.tile.openstreetmap.org %s", $trackingScriptSrc),
-            "manifest-src 'self'",
-        ];
+    $response          = $next($request);
+    $trackingScriptSrc = $this->getTrackingScriptSource();
+    $csp               = [
+      "default-src 'none'",
+      "object-src 'none'",
+      sprintf("script-src 'unsafe-eval' 'strict-dynamic' 'self' 'unsafe-inline' 'nonce-%1s' %2s", $nonce, $trackingScriptSrc),
+      "style-src 'unsafe-inline' 'self'",
+      "base-uri 'self'",
+      "font-src 'self' data:",
+      sprintf("connect-src 'self' %s", $trackingScriptSrc),
+      sprintf("img-src data: 'strict-dynamic' 'self' *.tile.openstreetmap.org %s", $trackingScriptSrc),
+      "manifest-src 'self'",
+    ];
 
-        $route     = $request->route();
-        $customUrl = '';
-        $authGuard = (string) config('firefly.authentication_guard');
-        $logoutUrl = (string) config('firefly.custom_logout_url');
-        if ('remote_user_guard' === $authGuard && '' !== $logoutUrl) {
-            $customUrl = $logoutUrl;
-        }
-
-        if (null !== $route && 'oauth/authorize' !== $route->uri) {
-            $csp[] = sprintf("form-action 'self' %s", $customUrl);
-        }
-
-        $featurePolicies = [
-            "geolocation 'none'",
-            "midi 'none'",
-            //"notifications 'none'",
-            //"push 'self'",
-            "sync-xhr 'self'",
-            "microphone 'none'",
-            "camera 'none'",
-            "magnetometer 'none'",
-            "gyroscope 'none'",
-            //"speaker 'none'",
-            //"vibrate 'none'",
-            "fullscreen 'self'",
-            "payment 'none'",
-        ];
-
-        $disableFrameHeader = config('firefly.disable_frame_header');
-        $disableCSP         = config('firefly.disable_csp_header');
-        if (false === $disableFrameHeader) {
-            $response->header('X-Frame-Options', 'deny');
-        }
-        if (false === $disableCSP && !$response->headers->has('Content-Security-Policy')) {
-            $response->header('Content-Security-Policy', implode('; ', $csp));
-        }
-        $response->header('X-XSS-Protection', '1; mode=block');
-        $response->header('X-Content-Type-Options', 'nosniff');
-        $response->header('Referrer-Policy', 'no-referrer');
-        $response->header('X-Permitted-Cross-Domain-Policies', 'none');
-        $response->header('X-Robots-Tag', 'none');
-        $response->header('Feature-Policy', implode('; ', $featurePolicies));
-
-        return $response;
+    $route     = $request->route();
+    $customUrl = '';
+    $authGuard = (string) config('firefly.authentication_guard');
+    $logoutUrl = (string) config('firefly.custom_logout_url');
+    if ('remote_user_guard' === $authGuard && '' !== $logoutUrl) {
+      $customUrl = $logoutUrl;
     }
 
-    /**
-     * Return part of a CSP header allowing scripts from Matomo.
-     *
-     * @return string
-     */
-    private function getTrackingScriptSource(): string
-    {
-        if ('' !== (string) config('firefly.tracker_site_id') && '' !== (string) config('firefly.tracker_url')) {
-            return (string) config('firefly.tracker_url');
-        }
-
-        return '';
+    if (null !== $route && 'oauth/authorize' !== $route->uri) {
+      $csp[] = sprintf("form-action 'self' %s", $customUrl);
     }
+
+    $featurePolicies = [
+      "geolocation 'none'",
+      "midi 'none'",
+      //"notifications 'none'",
+      //"push 'self'",
+      "sync-xhr 'self'",
+      "microphone 'none'",
+      "camera 'none'",
+      "magnetometer 'none'",
+      "gyroscope 'none'",
+      //"speaker 'none'",
+      //"vibrate 'none'",
+      "fullscreen 'self'",
+      "payment 'none'",
+    ];
+
+    $disableFrameHeader = config('firefly.disable_frame_header');
+    $disableCSP         = config('firefly.disable_csp_header');
+    if (false === $disableFrameHeader) {
+      $response->header('X-Frame-Options', 'deny');
+    }
+    if (false === $disableCSP && !$response->headers->has('Content-Security-Policy')) {
+      $response->header('Content-Security-Policy', implode('; ', $csp));
+    }
+    $response->header('X-XSS-Protection', '1; mode=block');
+    $response->header('X-Content-Type-Options', 'nosniff');
+    $response->header('Referrer-Policy', 'no-referrer');
+    $response->header('X-Permitted-Cross-Domain-Policies', 'none');
+    $response->header('X-Robots-Tag', 'none');
+    $response->header('Feature-Policy', implode('; ', $featurePolicies));
+    $response->header('Access-Control-Allow-Origin', '*');
+    $response->header('Access-Control-Allow-Headers', '*');
+
+    return $response;
+  }
+
+  /**
+   * Return part of a CSP header allowing scripts from Matomo.
+   *
+   * @return string
+   */
+  private function getTrackingScriptSource(): string
+  {
+    if ('' !== (string) config('firefly.tracker_site_id') && '' !== (string) config('firefly.tracker_url')) {
+      return (string) config('firefly.tracker_url');
+    }
+
+    return '';
+  }
 }
